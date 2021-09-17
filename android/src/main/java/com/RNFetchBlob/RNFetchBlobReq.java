@@ -14,6 +14,7 @@ import android.net.NetworkInfo;
 import android.net.NetworkCapabilities;
 import android.net.ConnectivityManager;
 import android.util.Base64;
+import android.util.Log;
 
 import com.RNFetchBlob.Response.RNFetchBlobDefaultResp;
 import com.RNFetchBlob.Response.RNFetchBlobFileResp;
@@ -565,7 +566,7 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                         // This usually mean the data is contains invalid unicode characters but still valid data,
                         // it's binary data, so send it as a normal string
                         catch(CharacterCodingException ignored) {
-                            
+
                             if(responseFormat == ResponseFormat.UTF8) {
                                 String utf8 = new String(b);
                                 callback.invoke(null, RNFetchBlobConst.RNFB_RESPONSE_UTF8, utf8);
@@ -766,16 +767,18 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                             return;
                         }
                         String contentUri = c.getString(c.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
-                        if ( contentUri != null &&
-                                options.addAndroidDownloads.hasKey("mime") &&
-                                options.addAndroidDownloads.getString("mime").contains("image")) {
+                        if ( contentUri != null ) {
                             Uri uri = Uri.parse(contentUri);
-                            Cursor cursor = appCtx.getContentResolver().query(uri, new String[]{android.provider.MediaStore.Images.ImageColumns.DATA}, null, null, null);
-                            // use default destination of DownloadManager
-                            if (cursor != null) {
-                                cursor.moveToFirst();
-                                filePath = cursor.getString(0);
-                                cursor.close();
+                            if(uri.toString().startsWith("file:")) {
+                                filePath = uri.getPath();
+                            } else {
+                                Cursor cursor = appCtx.getContentResolver().query(uri, new String[]{android.provider.MediaStore.Files.FileColumns.DATA}, null, null, null);
+                                // use default destination of DownloadManager
+                                if (cursor != null) {
+                                    cursor.moveToFirst();
+                                    filePath = cursor.getString(0);
+                                    cursor.close();
+                                }
                             }
                         }
                     }
@@ -786,7 +789,7 @@ public class RNFetchBlobReq extends BroadcastReceiver implements Runnable {
                 }
 
                 // When the file is not found in media content database, check if custom path exists
-                if (options.addAndroidDownloads.hasKey("path")) {
+                if (filePath == null && options.addAndroidDownloads.hasKey("path")) {
                     try {
                         String customDest = options.addAndroidDownloads.getString("path");
                         boolean exists = new File(customDest).exists();
